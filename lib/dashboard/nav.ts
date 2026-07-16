@@ -1,29 +1,34 @@
-import type { LucideIcon } from "lucide-react";
-import {
-  LayoutDashboard,
-  ShoppingCart,
-  PauseCircle,
-  Package,
-  Tags,
-  Users,
-  Truck,
-  PackagePlus,
-  Receipt,
-  Clock,
-  Boxes,
-  BarChart3,
-  UserCog,
-  Settings,
-  Code2,
-} from "lucide-react";
-
 /** Mirrors the Prisma `UserRole` enum values (string-compatible, no import cycle into generated client). */
 export type DashboardRole = "OWNER" | "MANAGER" | "CASHIER" | "INVENTORY_STAFF";
+
+/**
+ * String keys, not lucide component references: NAV_SECTIONS is built in a
+ * Server Component (dashboard layout) and passed as a prop into client nav
+ * components — passing the icon function itself would fail React's "cannot
+ * pass functions from Server to Client Components" serialization boundary.
+ * The client-side icon registry lives in sidebar-nav.tsx.
+ */
+export type NavIconKey =
+  | "dashboard"
+  | "shopping-cart"
+  | "pause-circle"
+  | "package"
+  | "tags"
+  | "users"
+  | "truck"
+  | "package-plus"
+  | "receipt"
+  | "clock"
+  | "boxes"
+  | "bar-chart"
+  | "user-cog"
+  | "settings"
+  | "code";
 
 export type NavItem = {
   href: string;
   label: string;
-  icon: LucideIcon;
+  icon: NavIconKey;
   roles: DashboardRole[];
 };
 
@@ -43,7 +48,7 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         href: "/dashboard",
         label: "Dashboard",
-        icon: LayoutDashboard,
+        icon: "dashboard",
         roles: BACK_OFFICE,
       },
     ],
@@ -54,19 +59,19 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         href: "/dashboard/pos",
         label: "Kasir (POS)",
-        icon: ShoppingCart,
+        icon: "shopping-cart",
         roles: ["OWNER", "MANAGER", "CASHIER"],
       },
       {
         href: "/dashboard/pos/held",
         label: "Transaksi Ditahan",
-        icon: PauseCircle,
+        icon: "pause-circle",
         roles: ["OWNER", "MANAGER", "CASHIER"],
       },
       {
         href: "/dashboard/shifts",
         label: "Shift Kasir",
-        icon: Clock,
+        icon: "clock",
         roles: ALL_ROLES.filter((r) => r !== "INVENTORY_STAFF"),
       },
     ],
@@ -77,31 +82,31 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         href: "/dashboard/products",
         label: "Produk",
-        icon: Package,
+        icon: "package",
         roles: STOCK_ROLES,
       },
       {
         href: "/dashboard/categories",
         label: "Kategori",
-        icon: Tags,
+        icon: "tags",
         roles: STOCK_ROLES,
       },
       {
         href: "/dashboard/stock",
         label: "Kartu Stok",
-        icon: Boxes,
+        icon: "boxes",
         roles: STOCK_ROLES,
       },
       {
         href: "/dashboard/restocks",
         label: "Restock",
-        icon: PackagePlus,
+        icon: "package-plus",
         roles: STOCK_ROLES,
       },
       {
         href: "/dashboard/suppliers",
         label: "Supplier",
-        icon: Truck,
+        icon: "truck",
         roles: STOCK_ROLES,
       },
     ],
@@ -112,13 +117,13 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         href: "/dashboard/customers",
         label: "Pelanggan",
-        icon: Users,
+        icon: "users",
         roles: ALL_ROLES.filter((r) => r !== "INVENTORY_STAFF"),
       },
       {
         href: "/dashboard/transactions",
         label: "Transaksi",
-        icon: Receipt,
+        icon: "receipt",
         roles: ALL_ROLES.filter((r) => r !== "INVENTORY_STAFF"),
       },
     ],
@@ -129,25 +134,25 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         href: "/dashboard/reports",
         label: "Laporan",
-        icon: BarChart3,
+        icon: "bar-chart",
         roles: BACK_OFFICE,
       },
       {
         href: "/dashboard/users",
         label: "Pengguna",
-        icon: UserCog,
+        icon: "user-cog",
         roles: BACK_OFFICE,
       },
       {
         href: "/dashboard/settings",
         label: "Pengaturan",
-        icon: Settings,
+        icon: "settings",
         roles: ["OWNER"],
       },
       {
         href: "/dashboard/developer",
         label: "Developer",
-        icon: Code2,
+        icon: "code",
         roles: ALL_ROLES,
       },
     ],

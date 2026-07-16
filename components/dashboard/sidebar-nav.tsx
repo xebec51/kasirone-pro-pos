@@ -2,8 +2,44 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { NavSection } from "@/lib/dashboard/nav";
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  PauseCircle,
+  Package,
+  Tags,
+  Users,
+  Truck,
+  PackagePlus,
+  Receipt,
+  Clock,
+  Boxes,
+  BarChart3,
+  UserCog,
+  Settings,
+  Code2,
+  type LucideIcon,
+} from "lucide-react";
+import type { NavIconKey, NavSection } from "@/lib/dashboard/nav";
 import { cn } from "@/lib/utils";
+
+const ICONS: Record<NavIconKey, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  "shopping-cart": ShoppingCart,
+  "pause-circle": PauseCircle,
+  package: Package,
+  tags: Tags,
+  users: Users,
+  truck: Truck,
+  "package-plus": PackagePlus,
+  receipt: Receipt,
+  clock: Clock,
+  boxes: Boxes,
+  "bar-chart": BarChart3,
+  "user-cog": UserCog,
+  settings: Settings,
+  code: Code2,
+};
 
 type SidebarNavProps = {
   sections: NavSection[];
@@ -28,7 +64,7 @@ export function SidebarNav({ sections, onNavigate }: SidebarNavProps) {
           <ul className="space-y-0.5">
             {section.items.map((item) => {
               const active = isActive(pathname, item.href);
-              const Icon = item.icon;
+              const Icon = ICONS[item.icon];
               return (
                 <li key={item.href}>
                   <Link

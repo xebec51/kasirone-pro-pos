@@ -1,7 +1,7 @@
 import "dotenv/config";
-import bcrypt from "bcryptjs";
 import { addDays, format, set as setDateFields, startOfDay } from "date-fns";
 import { prisma } from "@/lib/db";
+import { hashPassword } from "@/lib/auth/password";
 import {
   UserRole,
   UserStatus,
@@ -186,7 +186,7 @@ async function main() {
     },
   });
 
-  const passwordHash = await bcrypt.hash(PASSWORD, 10);
+  const passwordHash = await hashPassword(PASSWORD);
   const USER_DEFS = [
     { email: "owner@kasirone.demo", name: "Andi Wijaya", role: UserRole.OWNER },
     { email: "manager@kasirone.demo", name: "Siti Rahma", role: UserRole.MANAGER },
