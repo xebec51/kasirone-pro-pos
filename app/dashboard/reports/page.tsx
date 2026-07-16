@@ -1,19 +1,32 @@
-import { requireManagerOrOwner } from "@/lib/auth/rbac";
+import { addDays, format, subDays } from "date-fns";
+import { ExportButtons } from "@/components/reports/export-buttons";
+import { ReportFilters } from "@/components/reports/report-filters";
 import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
-import { BarChart3 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { requireManagerOrOwner } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
+import { formatCurrencyIDR } from "@/lib/pos/currency";
+import { PAYMENT_METHOD_LABELS } from "@/lib/pos/labels";
+import { toNumber } from "@/lib/pos/money";
 
-export default async function ReportsPage() {
-  await requireManagerOrOwner();
-
-  return (
-    <div className="space-y-6">
-      <PageHeader title="Laporan" description="Ringkasan penjualan, laba, dan stok." />
-      <EmptyState
-        icon={BarChart3}
-        title="Laporan akan segera hadir"
-        description="Halaman ini akan ditambahkan pada fase berikutnya."
-      />
-    </div>
-  );
+function validDate(value?: string) { return value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime()) ? value : undefined; }
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
+  const ctx = await requireManagerOrOwner(); const params = await searchParams; const today = new Date(); const from = validDate(params.from) ?? format(subDays(today, 29), "yyyy-MM-dd"); const to = validDate(params.to) ?? format(today, "yyyy-MM-dd"); const start = new Date(`${from}T00:00:00`); const end = addDays(new Date(`${to}T00:00:00`), 1); const dateWhere = { gte: start, lt: end };
+  const [sales, saleItems, payments, shifts, stockMovements, debtCustomers, debtAggregate] = await Promise.all([
+    prisma.sale.findMany({ where: { storeId: ctx.store.id, status: "COMPLETED", completedAt: dateWhere }, select: { total: true, itemDiscountTotal: true, transactionDiscount: true, cashierId: true, cashier: { select: { name: true } } }, take: 10_000 }),
+    prisma.saleItem.findMany({ where: { sale: { storeId: ctx.store.id, status: "COMPLETED", completedAt: dateWhere } }, select: { productId: true, productNameSnapshot: true, quantity: true, subtotal: true, costPriceSnapshot: true }, take: 10_000 }),
+    prisma.payment.findMany({ where: { storeId: ctx.store.id, createdAt: dateWhere, sale: { status: "COMPLETED" } }, select: { method: true, amount: true }, take: 10_000 }),
+    prisma.shift.findMany({ where: { storeId: ctx.store.id, openedAt: dateWhere }, select: { status: true, openingCash: true, expectedCash: true, actualCash: true, cashDifference: true }, take: 10_000 }),
+    prisma.stockMovement.findMany({ where: { storeId: ctx.store.id, createdAt: dateWhere }, select: { type: true, quantityChange: true }, take: 10_000 }),
+    prisma.customer.findMany({ where: { storeId: ctx.store.id, currentDebt: { gt: 0 } }, select: { id: true, name: true, phone: true, currentDebt: true, creditLimit: true }, orderBy: { currentDebt: "desc" }, take: 10 }),
+    prisma.customer.aggregate({ where: { storeId: ctx.store.id, currentDebt: { gt: 0 } }, _sum: { currentDebt: true } }),
+  ]);
+  const revenue = sales.reduce((sum, sale) => sum + toNumber(sale.total), 0); const discounts = sales.reduce((sum, sale) => sum + toNumber(sale.itemDiscountTotal) + toNumber(sale.transactionDiscount), 0); const profit = saleItems.reduce((sum, item) => sum + toNumber(item.subtotal) - toNumber(item.costPriceSnapshot) * toNumber(item.quantity), 0);
+  const products = [...saleItems.reduce((map, item) => { const current = map.get(item.productId) ?? { name: item.productNameSnapshot, quantity: 0, revenue: 0 }; current.quantity += toNumber(item.quantity); current.revenue += toNumber(item.subtotal); map.set(item.productId, current); return map; }, new Map<string, { name: string; quantity: number; revenue: number }>()).values()].sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+  const paymentSummary = [...payments.reduce((map, payment) => map.set(payment.method, (map.get(payment.method) ?? 0) + toNumber(payment.amount)), new Map<string, number>()).entries()].sort((a, b) => b[1] - a[1]);
+  const cashiers = [...sales.reduce((map, sale) => { const current = map.get(sale.cashierId) ?? { name: sale.cashier.name, count: 0, revenue: 0 }; current.count += 1; current.revenue += toNumber(sale.total); map.set(sale.cashierId, current); return map; }, new Map<string, { name: string; count: number; revenue: number }>()).values()].sort((a, b) => b.revenue - a.revenue);
+  const stockSummary = [...stockMovements.reduce((map, movement) => map.set(movement.type, (map.get(movement.type) ?? 0) + toNumber(movement.quantityChange)), new Map<string, number>()).entries()]; const totalDebt = toNumber(debtAggregate._sum.currentDebt ?? 0); const closedShifts = shifts.filter((shift) => shift.status === "CLOSED"); const totalDifference = closedShifts.reduce((sum, shift) => sum + toNumber(shift.cashDifference ?? 0), 0);
+  return <div className="space-y-6"><PageHeader title="Laporan" description="Ringkasan operasional toko berdasarkan rentang tanggal." actions={<ExportButtons from={from} to={to} />} /><ReportFilters from={from} to={to} /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{[["Transaksi", String(sales.length)], ["Penjualan", formatCurrencyIDR(revenue)], ["Diskon", formatCurrencyIDR(discounts)], ["Estimasi laba", formatCurrencyIDR(profit)], ["Utang aktif", formatCurrencyIDR(totalDebt)]].map(([label, value]) => <div key={label} className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold">{value}</p></div>)}</div><div className="grid gap-6 xl:grid-cols-2"><ReportTable title="Penjualan Produk" headers={["Produk", "Jumlah", "Penjualan"]} rows={products.map((product) => [product.name, product.quantity.toLocaleString("id-ID"), formatCurrencyIDR(product.revenue)])} /><ReportTable title="Metode Pembayaran" headers={["Metode", "Jumlah"]} rows={paymentSummary.map(([method, amount]) => [PAYMENT_METHOD_LABELS[method] ?? method, formatCurrencyIDR(amount)])} /><ReportTable title="Kinerja Kasir" headers={["Kasir", "Transaksi", "Penjualan"]} rows={cashiers.map((cashier) => [cashier.name, String(cashier.count), formatCurrencyIDR(cashier.revenue)])} /><ReportTable title="Ringkasan Shift" headers={["Metrik", "Nilai"]} rows={[["Total shift", String(shifts.length)], ["Shift ditutup", String(closedShifts.length)], ["Shift terbuka", String(shifts.length - closedShifts.length)], ["Total selisih kas", formatCurrencyIDR(totalDifference)]]} /><ReportTable title="Pergerakan Stok" headers={["Jenis", "Perubahan Bersih"]} rows={stockSummary.map(([type, quantity]) => [type.replaceAll("_", " "), quantity.toLocaleString("id-ID")])} /><ReportTable title="Utang Pelanggan" headers={["Pelanggan", "Telepon", "Utang"]} rows={debtCustomers.map((customer) => [customer.name, customer.phone ?? "-", formatCurrencyIDR(toNumber(customer.currentDebt))])} /></div></div>;
 }
+
+function ReportTable({ title, headers, rows }: { title: string; headers: string[]; rows: string[][] }) { return <section className="space-y-3"><h2 className="font-semibold">{title}</h2>{rows.length === 0 ? <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">Tidak ada data.</p> : <div className="rounded-lg border"><Table><TableHeader><TableRow>{headers.map((header) => <TableHead key={header}>{header}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.map((row, index) => <TableRow key={`${row[0]}-${index}`}>{row.map((cell, cellIndex) => <TableCell key={`${cellIndex}-${cell}`} className={cellIndex === 0 ? "font-medium" : undefined}>{cell}</TableCell>)}</TableRow>)}</TableBody></Table></div>}</section>; }
