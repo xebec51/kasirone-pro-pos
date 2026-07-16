@@ -676,6 +676,9 @@ async function main() {
   await prisma.debtPayment.create({
     data: { storeId: store.id, customerId: customerByKey.joko.id, receivedById: cashier.id, shiftId: shiftA.id, amount: 15000, method: PaymentMethod.CASH, paidAt: jokoPaymentDate, createdAt: jokoPaymentDate },
   });
+  await prisma.cashMovement.create({
+    data: { storeId: store.id, shiftId: shiftA.id, userId: cashier.id, type: CashMovementType.DEBT_PAYMENT, amount: 15000, notes: "Pembayaran utang Joko Prasetyo", createdAt: jokoPaymentDate },
+  });
   await prisma.customer.update({ where: { id: customerByKey.joko.id }, data: { currentDebt: { decrement: 15000 } } });
   shiftAccumulators[shiftA.id].cashIn += 15000;
   await prisma.activityLog.create({
@@ -723,6 +726,9 @@ async function main() {
   await prisma.debtPayment.create({
     data: { storeId: store.id, customerId: customerByKey.rina.id, receivedById: cashier.id, shiftId: shiftB.id, amount: 30000, method: PaymentMethod.CASH, paidAt: rinaPayment1Date, createdAt: rinaPayment1Date },
   });
+  await prisma.cashMovement.create({
+    data: { storeId: store.id, shiftId: shiftB.id, userId: cashier.id, type: CashMovementType.DEBT_PAYMENT, amount: 30000, notes: "Pembayaran utang Rina Kusuma", createdAt: rinaPayment1Date },
+  });
   await prisma.customer.update({ where: { id: customerByKey.rina.id }, data: { currentDebt: { decrement: 30000 } } });
   shiftAccumulators[shiftB.id].cashIn += 30000;
   await prisma.activityLog.create({
@@ -767,6 +773,9 @@ async function main() {
   const rinaPayment2Date = at(shiftCDate, 11, 0);
   await prisma.debtPayment.create({
     data: { storeId: store.id, customerId: customerByKey.rina.id, receivedById: cashier.id, shiftId: shiftC.id, amount: 20000, method: PaymentMethod.CASH, paidAt: rinaPayment2Date, createdAt: rinaPayment2Date },
+  });
+  await prisma.cashMovement.create({
+    data: { storeId: store.id, shiftId: shiftC.id, userId: cashier.id, type: CashMovementType.DEBT_PAYMENT, amount: 20000, notes: "Pembayaran utang Rina Kusuma", createdAt: rinaPayment2Date },
   });
   await prisma.customer.update({ where: { id: customerByKey.rina.id }, data: { currentDebt: { decrement: 20000 } } });
   shiftAccumulators[shiftC.id].cashIn += 20000;

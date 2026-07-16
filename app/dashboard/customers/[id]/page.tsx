@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { UserRole } from "@/app/generated/prisma/client";
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
+import { DebtPaymentDialog } from "@/components/customers/debt-payment-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -66,7 +67,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       <PageHeader
         title={customer.name}
         description="Detail pelanggan, transaksi terbaru, dan riwayat pembayaran utang."
-        actions={<CustomerFormDialog customer={editableCustomer} />}
+        actions={<><CustomerFormDialog customer={editableCustomer} />{currentDebt > 0 ? <DebtPaymentDialog customerId={customer.id} customerName={customer.name} currentDebt={currentDebt} /> : null}</>}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
