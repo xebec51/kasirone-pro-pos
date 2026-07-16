@@ -1,0 +1,15 @@
+"use client";
+
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRef } from "react";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const TYPES = ["SALE", "RESTOCK", "MANUAL_ADJUSTMENT", "VOID", "REFUND", "STOCK_OPNAME", "DAMAGED", "EXPIRED"];
+export function StockFilters({ products }: { products: { id: string; name: string; sku: string }[] }) {
+  const router = useRouter(); const pathname = usePathname(); const searchParams = useSearchParams(); const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function update(key: string, value: string) { const params = new URLSearchParams(searchParams.toString()); if (value) params.set(key, value); else params.delete(key); params.delete("page"); router.replace(`${pathname}?${params.toString()}`); }
+  function search(value: string) { if (timeoutRef.current) clearTimeout(timeoutRef.current); timeoutRef.current = setTimeout(() => update("q", value), 350); }
+  return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><div className="relative sm:col-span-2"><Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input defaultValue={searchParams.get("q") ?? ""} onChange={(event) => search(event.target.value)} placeholder="Produk, SKU, atau alasan" className="pl-8" /></div><Select defaultValue={searchParams.get("productId") ?? "all"} onValueChange={(value) => update("productId", value && value !== "all" ? value : "")}><SelectTrigger aria-label="Filter produk"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Semua produk</SelectItem>{products.map((product) => <SelectItem key={product.id} value={product.id}>{product.name} · {product.sku}</SelectItem>)}</SelectContent></Select><Select defaultValue={searchParams.get("type") ?? "all"} onValueChange={(value) => update("type", value && value !== "all" ? value : "")}><SelectTrigger aria-label="Filter jenis"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Semua jenis</SelectItem>{TYPES.map((type) => <SelectItem key={type} value={type}>{type.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select><Select defaultValue={searchParams.get("lowStock") ?? "all"} onValueChange={(value) => update("lowStock", value && value !== "all" ? value : "")}><SelectTrigger aria-label="Filter stok rendah"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Semua stok</SelectItem><SelectItem value="low">Stok rendah saja</SelectItem></SelectContent></Select><div className="grid grid-cols-2 gap-2 xl:col-span-1"><Input type="date" defaultValue={searchParams.get("from") ?? ""} onChange={(event) => update("from", event.target.value)} aria-label="Tanggal mulai" /><Input type="date" defaultValue={searchParams.get("to") ?? ""} onChange={(event) => update("to", event.target.value)} aria-label="Tanggal akhir" /></div></div>;
+}
