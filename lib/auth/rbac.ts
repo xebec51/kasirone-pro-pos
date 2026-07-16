@@ -20,14 +20,22 @@ export type AuthContext = {
 export async function requireStoreMember(): Promise<AuthContext> {
   const sessionUser = await requireCurrentUser();
 
-  const user = await prisma.user.findUnique({ where: { id: sessionUser.id } });
+  const user = await prisma.user.findUnique({
+    where: { id: sessionUser.id },
+    select: { id: true, name: true, email: true, status: true },
+  });
   if (!user || user.status !== "ACTIVE") {
     redirect("/unauthorized");
   }
 
   const member = await prisma.storeMember.findFirst({
     where: { userId: user.id, isActive: true },
-    include: { store: true },
+    select: {
+      id: true,
+      role: true,
+      isActive: true,
+      store: { select: { id: true, name: true, slug: true, currency: true } },
+    },
     orderBy: { createdAt: "asc" },
   });
   if (!member) {
@@ -76,7 +84,7 @@ export async function requireProductAccess(): Promise<AuthContext> {
 
 export async function requireSaleAccess(saleId: string) {
   const ctx = await requireAnyRole([UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER]);
-  const sale = await prisma.sale.findFirst({ where: { id: saleId, storeId: ctx.store.id } });
+  const sale = await prisma.sale.findFirst({ where: { id: saleId, storeId: ctx.store.id }, select: { id: true, cashierId: true } });
   if (!sale) notFound();
   if (ctx.member.role === UserRole.CASHIER && sale.cashierId !== ctx.user.id) {
     redirect("/unauthorized");
@@ -86,7 +94,7 @@ export async function requireSaleAccess(saleId: string) {
 
 export async function requireShiftAccess(shiftId: string) {
   const ctx = await requireAnyRole([UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER]);
-  const shift = await prisma.shift.findFirst({ where: { id: shiftId, storeId: ctx.store.id } });
+  const shift = await prisma.shift.findFirst({ where: { id: shiftId, storeId: ctx.store.id }, select: { id: true, cashierId: true } });
   if (!shift) notFound();
   if (ctx.member.role === UserRole.CASHIER && shift.cashierId !== ctx.user.id) {
     redirect("/unauthorized");

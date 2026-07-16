@@ -260,6 +260,7 @@ model Customer {
 
   @@index([storeId, status])
   @@index([storeId, name])
+  @@index([storeId, currentDebt])
   @@map("customers")
 }
 
@@ -307,6 +308,7 @@ model Shift {
 
   @@index([storeId, cashierId, status])
   @@index([storeId, status])
+  @@index([storeId, openedAt])
   @@map("shifts")
 }
 
@@ -363,6 +365,7 @@ model Sale {
   receipt  Receipt?
 
   @@index([storeId, status, createdAt])
+  @@index([storeId, completedAt])
   @@index([storeId, cashierId])
   @@index([storeId, customerId])
   @@index([shiftId])
@@ -408,6 +411,7 @@ model Payment {
 
   @@index([saleId])
   @@index([storeId, method])
+  @@index([storeId, createdAt])
   @@index([shiftId])
   @@map("payments")
 }
@@ -473,6 +477,7 @@ model RestockOrder {
 
   @@index([storeId, status])
   @@index([storeId, supplierId])
+  @@index([storeId, createdAt])
   @@map("restock_orders")
 }
 

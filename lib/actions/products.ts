@@ -56,6 +56,14 @@ export async function createProduct(_prev: ActionState, formData: FormData): Pro
   }
   const data = parsed.data;
 
+  if (data.categoryId) {
+    const category = await prisma.category.findFirst({
+      where: { id: data.categoryId, storeId: ctx.store.id },
+      select: { id: true },
+    });
+    if (!category) return { success: false, error: "Kategori tidak ditemukan di toko ini." };
+  }
+
   const existingSku = await prisma.product.findUnique({
     where: { storeId_sku: { storeId: ctx.store.id, sku: data.sku } },
   });
@@ -130,6 +138,14 @@ export async function updateProduct(
     return { success: false, error: "Produk tidak ditemukan." };
   }
 
+  if (data.categoryId) {
+    const category = await prisma.category.findFirst({
+      where: { id: data.categoryId, storeId: ctx.store.id },
+      select: { id: true },
+    });
+    if (!category) return { success: false, error: "Kategori tidak ditemukan di toko ini." };
+  }
+
   if (data.sku !== product.sku) {
     const existingSku = await prisma.product.findUnique({
       where: { storeId_sku: { storeId: ctx.store.id, sku: data.sku } },
@@ -139,30 +155,32 @@ export async function updateProduct(
     }
   }
 
-  await prisma.product.update({
-    where: { id },
-    data: {
-      categoryId: data.categoryId || null,
-      sku: data.sku,
-      barcode: data.barcode || null,
-      name: data.name,
-      description: data.description || null,
-      costPrice: data.costPrice,
-      sellingPrice: data.sellingPrice,
-      minStock: data.minStock,
-      unit: data.unit,
-      status: data.status,
-      imageUrl: data.imageUrl || null,
-    },
-  });
-  await prisma.activityLog.create({
-    data: {
-      storeId: ctx.store.id,
-      userId: ctx.user.id,
-      action: "UPDATE",
-      module: "products",
-      description: `Memperbarui produk ${data.name}`,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.product.update({
+      where: { id },
+      data: {
+        categoryId: data.categoryId || null,
+        sku: data.sku,
+        barcode: data.barcode || null,
+        name: data.name,
+        description: data.description || null,
+        costPrice: data.costPrice,
+        sellingPrice: data.sellingPrice,
+        minStock: data.minStock,
+        unit: data.unit,
+        status: data.status,
+        imageUrl: data.imageUrl || null,
+      },
+    });
+    await tx.activityLog.create({
+      data: {
+        storeId: ctx.store.id,
+        userId: ctx.user.id,
+        action: "UPDATE",
+        module: "products",
+        description: `Memperbarui produk ${data.name}`,
+      },
+    });
   });
 
   revalidatePath("/dashboard/products");

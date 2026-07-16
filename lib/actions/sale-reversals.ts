@@ -27,9 +27,14 @@ async function reverseSale(saleId: string, reason: string, kind: "VOID" | "REFUN
       });
       if (!sale) throw new ReversalError("Transaksi tidak ditemukan atau sudah dibatalkan/refund.");
       const reversalShift = await tx.shift.findFirst({ where: { storeId: ctx.store.id, cashierId: ctx.user.id, status: "OPEN" }, select: { id: true } });
+      const products = await tx.product.findMany({
+        where: { storeId: ctx.store.id, id: { in: sale.items.map((item) => item.productId) } },
+        select: { id: true, stock: true },
+      });
+      const productMap = new Map(products.map((product) => [product.id, product]));
 
       for (const item of sale.items) {
-        const product = await tx.product.findFirst({ where: { id: item.productId, storeId: ctx.store.id }, select: { id: true, stock: true } });
+        const product = productMap.get(item.productId);
         if (!product) throw new ReversalError(`Produk ${item.productNameSnapshot} tidak ditemukan.`);
         const stockBefore = toNumber(product.stock);
         const quantity = toNumber(item.quantity);
