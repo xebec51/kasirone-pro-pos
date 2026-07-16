@@ -152,3 +152,31 @@
     @apply font-sans;
   }
 }
+
+@media print {
+  @page {
+    margin: 0;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .receipt-print-area,
+  .receipt-print-area * {
+    visibility: visible !important;
+  }
+
+  .receipt-print-area {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    print-color-adjust: exact;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
