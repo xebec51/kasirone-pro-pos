@@ -61,7 +61,7 @@ export function ProductFormDialog({ categories }: { categories: Category[] }) {
           <DialogDescription>Lengkapi data produk baru untuk toko Anda.</DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="sku">SKU</Label>
               <Input id="sku" name="sku" required maxLength={50} />
@@ -99,7 +99,7 @@ export function ProductFormDialog({ categories }: { categories: Category[] }) {
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="costPrice">Harga Modal (Rp)</Label>
               <Input id="costPrice" name="costPrice" type="number" min={0} step="1" required />
@@ -110,7 +110,7 @@ export function ProductFormDialog({ categories }: { categories: Category[] }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="stock">Stok Awal</Label>
               <Input id="stock" name="stock" type="number" min={0} step="1" defaultValue={0} required />

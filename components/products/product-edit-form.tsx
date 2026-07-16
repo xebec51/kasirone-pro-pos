@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateProduct, type ActionState } from "@/lib/actions/products";
-
-const initialState: ActionState = { success: false };
 
 type Category = { id: string; name: string };
 
@@ -38,18 +36,21 @@ type ProductEditFormProps = {
 };
 
 export function ProductEditForm({ product, categories }: ProductEditFormProps) {
-  const action = updateProduct.bind(null, product.id);
-  const [state, formAction, isPending] = useActionState(action, initialState);
+  const [state, setState] = useState<ActionState>({ success: false });
+  const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
-    if (state.success) {
-      toast.success("Produk diperbarui.");
-    }
-  }, [state]);
+  function handleSubmit(formData: FormData) {
+    setState({ success: false });
+    startTransition(async () => {
+      const result = await updateProduct(product.id, { success: false }, formData);
+      setState(result);
+      if (result.success) toast.success("Produk diperbarui.");
+    });
+  }
 
   return (
-    <form action={formAction} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+    <form action={handleSubmit} className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="sku">SKU</Label>
           <Input id="sku" name="sku" defaultValue={product.sku} required maxLength={50} />
@@ -87,7 +88,7 @@ export function ProductEditForm({ product, categories }: ProductEditFormProps) {
         </Select>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="costPrice">Harga Modal (Rp)</Label>
           <Input id="costPrice" name="costPrice" type="number" min={0} step="1" defaultValue={product.costPrice} required />
@@ -98,7 +99,7 @@ export function ProductEditForm({ product, categories }: ProductEditFormProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="minStock">Stok Minimum</Label>
           <Input id="minStock" name="minStock" type="number" min={0} step="1" defaultValue={product.minStock} required />
