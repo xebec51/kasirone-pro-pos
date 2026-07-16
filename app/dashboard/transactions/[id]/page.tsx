@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReceiptActions } from "@/components/transactions/receipt-actions";
+import { SaleReversalActions } from "@/components/transactions/sale-reversal-actions";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,6 +10,7 @@ import { prisma } from "@/lib/db";
 import { formatCurrencyIDR } from "@/lib/pos/currency";
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, SALE_STATUS_LABELS } from "@/lib/pos/labels";
 import { toNumber } from "@/lib/pos/money";
+import { UserRole } from "@/app/generated/prisma/client";
 
 const DATE_FORMAT = new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeStyle: "short" });
 
@@ -33,7 +35,7 @@ export default async function TransactionDetailPage({ params }: { params: Promis
   const statusTone = sale.status === "COMPLETED" ? "success" : sale.status === "HELD" ? "warning" : "danger";
 
   return <div className="space-y-6">
-    <div className="no-print"><PageHeader title={sale.saleNumber} description={DATE_FORMAT.format(transactionDate)} actions={sale.receipt ? <ReceiptActions saleId={sale.id} /> : undefined} /></div>
+    <div className="no-print"><PageHeader title={sale.saleNumber} description={DATE_FORMAT.format(transactionDate)} actions={<>{sale.receipt ? <ReceiptActions saleId={sale.id} /> : null}{sale.status === "COMPLETED" && (ctx.member.role === UserRole.OWNER || ctx.member.role === UserRole.MANAGER) ? <SaleReversalActions saleId={sale.id} saleNumber={sale.saleNumber} /> : null}</>} /></div>
     <div className="no-print flex flex-wrap items-center gap-3 rounded-lg border bg-card p-4"><StatusBadge label={SALE_STATUS_LABELS[sale.status] ?? sale.status} tone={statusTone} /><StatusBadge label={PAYMENT_STATUS_LABELS[sale.paymentStatus] ?? sale.paymentStatus} tone={sale.paymentStatus === "PAID" ? "success" : sale.paymentStatus === "UNPAID" ? "danger" : "warning"} /><span className="text-sm text-muted-foreground">Operator: {sale.cashier.name}</span>{sale.shift ? <Link href={`/dashboard/shifts/${sale.shift.id}`} className="text-sm font-medium text-primary hover:underline">Lihat shift</Link> : null}</div>
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_auto]">
       <div className="no-print space-y-6">
