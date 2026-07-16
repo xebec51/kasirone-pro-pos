@@ -1,24 +1,23 @@
-import { requireProductAccess } from "@/lib/auth/rbac";
+import { notFound } from "next/navigation";
+import { RestockOrderActions } from "@/components/restocks/restock-order-actions";
 import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState } from "@/components/shared/empty-state";
-import { PackagePlus } from "lucide-react";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { requireProductAccess } from "@/lib/auth/rbac";
+import { prisma } from "@/lib/db";
+import { formatCurrencyIDR } from "@/lib/pos/currency";
+import { RESTOCK_STATUS_LABELS } from "@/lib/pos/labels";
+import { toNumber } from "@/lib/pos/money";
 
-export default async function RestockDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  await requireProductAccess();
-  await params;
-
-  return (
-    <div className="space-y-6">
-      <PageHeader title="Detail Restock" description="Rincian order restock dan status penerimaan." />
-      <EmptyState
-        icon={PackagePlus}
-        title="Detail restock akan segera hadir"
-        description="Halaman ini akan ditambahkan pada fase berikutnya."
-      />
-    </div>
-  );
+const DATE_FORMAT = new Intl.DateTimeFormat("id-ID", { dateStyle: "long", timeStyle: "short" });
+export default async function RestockDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const ctx = await requireProductAccess(); const { id } = await params;
+  const [order, products] = await Promise.all([
+    prisma.restockOrder.findFirst({ where: { id, storeId: ctx.store.id }, select: { id: true, orderNumber: true, status: true, orderDate: true, receivedDate: true, notes: true, totalCost: true, supplier: { select: { id: true, name: true, contactName: true, phone: true } }, createdBy: { select: { name: true } }, items: { select: { id: true, productId: true, quantityOrdered: true, quantityReceived: true, unitCost: true, subtotal: true, product: { select: { name: true, sku: true, unit: true } } }, orderBy: { createdAt: "asc" } } } }),
+    prisma.product.findMany({ where: { storeId: ctx.store.id, status: { not: "ARCHIVED" } }, select: { id: true, name: true, sku: true, unit: true, costPrice: true }, orderBy: { name: "asc" }, take: 1000 }),
+  ]);
+  if (!order) notFound();
+  const actionOrder = { id: order.id, orderNumber: order.orderNumber, status: order.status, items: order.items.map((item) => ({ id: item.id, productName: item.product.name, unit: item.product.unit, quantityOrdered: toNumber(item.quantityOrdered), quantityReceived: toNumber(item.quantityReceived) })) };
+  const productOptions = products.map((product) => ({ id: product.id, name: product.name, sku: product.sku, unit: product.unit, costPrice: toNumber(product.costPrice) }));
+  return <div className="space-y-6"><PageHeader title={order.orderNumber} description={`Dibuat ${DATE_FORMAT.format(order.orderDate)} oleh ${order.createdBy.name}`} actions={<RestockOrderActions order={actionOrder} products={productOptions} />} /><div className="grid gap-4 md:grid-cols-3"><section className="rounded-lg border bg-card p-4 md:col-span-2"><h2 className="font-semibold">Supplier</h2><p className="mt-3 font-medium">{order.supplier?.name ?? "-"}</p><p className="text-sm text-muted-foreground">{order.supplier?.contactName || order.supplier?.phone || "Kontak tidak tersedia"}</p><p className="mt-4 whitespace-pre-wrap text-sm text-muted-foreground">{order.notes || "Tidak ada catatan."}</p></section><section className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">Status</p><div className="mt-2"><StatusBadge label={RESTOCK_STATUS_LABELS[order.status] ?? order.status} tone={order.status === "RECEIVED" ? "success" : order.status === "CANCELLED" ? "danger" : "info"} /></div><p className="mt-5 text-xs text-muted-foreground">Total pesanan</p><p className="mt-1 text-2xl font-semibold">{formatCurrencyIDR(toNumber(order.totalCost))}</p>{order.receivedDate ? <p className="mt-3 text-xs text-muted-foreground">Diterima {DATE_FORMAT.format(order.receivedDate)}</p> : null}</section></div><section className="space-y-3"><h2 className="font-semibold">Item Restock</h2>{order.items.length === 0 ? <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">Tambahkan item sebelum menandai pesanan sebagai dipesan.</p> : <div className="rounded-lg border"><Table><TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Dipesan</TableHead><TableHead>Diterima</TableHead><TableHead>Biaya</TableHead><TableHead className="text-right">Subtotal</TableHead></TableRow></TableHeader><TableBody>{order.items.map((item) => <TableRow key={item.id}><TableCell><p className="font-medium">{item.product.name}</p><p className="text-xs text-muted-foreground">{item.product.sku}</p></TableCell><TableCell>{toNumber(item.quantityOrdered)} {item.product.unit}</TableCell><TableCell>{toNumber(item.quantityReceived)} {item.product.unit}</TableCell><TableCell>{formatCurrencyIDR(toNumber(item.unitCost))}</TableCell><TableCell className="text-right">{formatCurrencyIDR(toNumber(item.subtotal))}</TableCell></TableRow>)}</TableBody></Table></div>}</section></div>;
 }
