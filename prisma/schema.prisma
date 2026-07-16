@@ -1,6 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
+// KasirOne Pro — manual POS and store operations schema.
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
@@ -10,4 +8,550 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ==================================================
+// ENUMS
+// ==================================================
+
+enum UserRole {
+  OWNER
+  MANAGER
+  CASHIER
+  INVENTORY_STAFF
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum SaleStatus {
+  HELD
+  COMPLETED
+  VOIDED
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  QRIS_MANUAL
+  DEBIT
+  CREDIT
+  E_WALLET_MANUAL
+  STORE_CREDIT
+  OTHER
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIALLY_PAID
+  UNPAID
+  REFUNDED
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum StockMovementType {
+  SALE
+  RESTOCK
+  MANUAL_ADJUSTMENT
+  VOID
+  REFUND
+  STOCK_OPNAME
+  DAMAGED
+  EXPIRED
+}
+
+enum CashMovementType {
+  OPENING_CASH
+  CASH_IN
+  CASH_OUT
+  SALE_PAYMENT
+  REFUND
+  DEBT_PAYMENT
+  CLOSING_ADJUSTMENT
+}
+
+enum RestockStatus {
+  DRAFT
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum ActivityAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  OPEN_SHIFT
+  CLOSE_SHIFT
+  CREATE_SALE
+  HOLD_SALE
+  VOID_SALE
+  REFUND_SALE
+  RESTOCK
+  ADJUST_STOCK
+  RECEIVE_PAYMENT
+  EXPORT
+}
+
+// ==================================================
+// MODELS
+// ==================================================
+
+model User {
+  id        String     @id @default(cuid())
+  name      String
+  email     String     @unique
+  password  String
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  storeMembers          StoreMember[]
+  shifts                Shift[]
+  sales                 Sale[]
+  cashMovements         CashMovement[]
+  stockMovementsCreated StockMovement[]
+  restockOrdersCreated  RestockOrder[]
+  debtPaymentsReceived  DebtPayment[]
+  activityLogs          ActivityLog[]
+
+  @@map("users")
+}
+
+model Store {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  address       String?
+  phone         String?
+  email         String?
+  taxNumber     String?  @map("tax_number")
+  receiptFooter String?  @map("receipt_footer")
+  currency      String   @default("IDR")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  members        StoreMember[]
+  settings       StoreSetting?
+  categories     Category[]
+  products       Product[]
+  customers      Customer[]
+  suppliers      Supplier[]
+  shifts         Shift[]
+  cashMovements  CashMovement[]
+  sales          Sale[]
+  payments       Payment[]
+  receipts       Receipt[]
+  stockMovements StockMovement[]
+  restockOrders  RestockOrder[]
+  debtPayments   DebtPayment[]
+  activityLogs   ActivityLog[]
+
+  @@map("stores")
+}
+
+model StoreMember {
+  id        String   @id @default(cuid())
+  storeId   String   @map("store_id")
+  userId    String   @map("user_id")
+  role      UserRole
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, userId])
+  @@index([storeId, role])
+  @@index([userId])
+  @@map("store_members")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  storeId     String   @map("store_id")
+  name        String
+  slug        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@map("categories")
+}
+
+model Product {
+  id           String        @id @default(cuid())
+  storeId      String        @map("store_id")
+  categoryId   String?       @map("category_id")
+  sku          String
+  barcode      String?
+  name         String
+  description  String?
+  costPrice    Decimal       @map("cost_price") @db.Decimal(14, 2)
+  sellingPrice Decimal       @map("selling_price") @db.Decimal(14, 2)
+  stock        Decimal       @default(0) @db.Decimal(12, 3)
+  minStock     Decimal       @default(0) @map("min_stock") @db.Decimal(12, 3)
+  unit         String        @default("pcs")
+  status       ProductStatus @default(ACTIVE)
+  imageUrl     String?       @map("image_url")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  store          Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category       Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  saleItems      SaleItem[]
+  stockMovements StockMovement[]
+  restockItems   RestockOrderItem[]
+
+  @@unique([storeId, sku])
+  @@index([storeId, status, stock])
+  @@index([storeId, categoryId])
+  @@index([storeId, barcode])
+  @@index([storeId, name])
+  @@map("products")
+}
+
+model Customer {
+  id          String         @id @default(cuid())
+  storeId     String         @map("store_id")
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  notes       String?
+  status      CustomerStatus @default(ACTIVE)
+  creditLimit Decimal?       @map("credit_limit") @db.Decimal(14, 2)
+  currentDebt Decimal        @default(0) @map("current_debt") @db.Decimal(14, 2)
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  store        Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sales        Sale[]
+  debtPayments DebtPayment[]
+
+  @@index([storeId, status])
+  @@index([storeId, name])
+  @@map("customers")
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  storeId     String   @map("store_id")
+  name        String
+  contactName String?  @map("contact_name")
+  phone       String?
+  email       String?
+  address     String?
+  notes       String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  store         Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  restockOrders RestockOrder[]
+
+  @@index([storeId, isActive])
+  @@map("suppliers")
+}
+
+model Shift {
+  id             String      @id @default(cuid())
+  storeId        String      @map("store_id")
+  cashierId      String      @map("cashier_id")
+  status         ShiftStatus @default(OPEN)
+  openedAt       DateTime    @default(now()) @map("opened_at")
+  closedAt       DateTime?   @map("closed_at")
+  openingCash    Decimal     @map("opening_cash") @db.Decimal(14, 2)
+  expectedCash   Decimal?    @map("expected_cash") @db.Decimal(14, 2)
+  actualCash     Decimal?    @map("actual_cash") @db.Decimal(14, 2)
+  cashDifference Decimal?    @map("cash_difference") @db.Decimal(14, 2)
+  notes          String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  store         Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cashier       User           @relation(fields: [cashierId], references: [id], onDelete: Restrict)
+  sales         Sale[]
+  payments      Payment[]
+  cashMovements CashMovement[]
+  debtPayments  DebtPayment[]
+
+  @@index([storeId, cashierId, status])
+  @@index([storeId, status])
+  @@map("shifts")
+}
+
+model CashMovement {
+  id        String           @id @default(cuid())
+  storeId   String           @map("store_id")
+  shiftId   String?          @map("shift_id")
+  userId    String           @map("user_id")
+  type      CashMovementType
+  amount    Decimal          @db.Decimal(14, 2)
+  notes     String?
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  store Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  shift Shift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([storeId, shiftId])
+  @@index([storeId, createdAt])
+  @@map("cash_movements")
+}
+
+model Sale {
+  id                  String        @id @default(cuid())
+  storeId             String        @map("store_id")
+  shiftId             String?       @map("shift_id")
+  cashierId           String        @map("cashier_id")
+  customerId          String?       @map("customer_id")
+  saleNumber          String        @unique @map("sale_number")
+  status              SaleStatus    @default(HELD)
+  paymentStatus       PaymentStatus @default(UNPAID) @map("payment_status")
+  subtotal            Decimal       @db.Decimal(14, 2)
+  itemDiscountTotal   Decimal       @default(0) @map("item_discount_total") @db.Decimal(14, 2)
+  transactionDiscount Decimal       @default(0) @map("transaction_discount") @db.Decimal(14, 2)
+  taxAmount           Decimal       @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  serviceAmount       Decimal       @default(0) @map("service_amount") @db.Decimal(14, 2)
+  total               Decimal       @db.Decimal(14, 2)
+  paidAmount          Decimal       @default(0) @map("paid_amount") @db.Decimal(14, 2)
+  changeAmount        Decimal       @default(0) @map("change_amount") @db.Decimal(14, 2)
+  unpaidAmount        Decimal       @default(0) @map("unpaid_amount") @db.Decimal(14, 2)
+  notes               String?
+  completedAt         DateTime?     @map("completed_at")
+  voidedAt            DateTime?     @map("voided_at")
+  voidReason          String?       @map("void_reason")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  store    Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  shift    Shift?     @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  cashier  User       @relation(fields: [cashierId], references: [id], onDelete: Restrict)
+  customer Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items    SaleItem[]
+  payments Payment[]
+  receipt  Receipt?
+
+  @@index([storeId, status, createdAt])
+  @@index([storeId, cashierId])
+  @@index([storeId, customerId])
+  @@index([shiftId])
+  @@map("sales")
+}
+
+model SaleItem {
+  id                  String   @id @default(cuid())
+  saleId              String   @map("sale_id")
+  productId           String   @map("product_id")
+  productNameSnapshot String   @map("product_name_snapshot")
+  skuSnapshot         String   @map("sku_snapshot")
+  unitSnapshot        String   @map("unit_snapshot")
+  quantity            Decimal  @db.Decimal(12, 3)
+  unitPrice           Decimal  @map("unit_price") @db.Decimal(14, 2)
+  costPriceSnapshot   Decimal  @map("cost_price_snapshot") @db.Decimal(14, 2)
+  discountAmount      Decimal  @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  subtotal            Decimal  @db.Decimal(14, 2)
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([saleId])
+  @@index([productId])
+  @@map("sale_items")
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  saleId    String        @map("sale_id")
+  storeId   String        @map("store_id")
+  shiftId   String?       @map("shift_id")
+  method    PaymentMethod
+  amount    Decimal       @db.Decimal(14, 2)
+  reference String?
+  notes     String?
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  sale  Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  store Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  shift Shift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
+  @@index([saleId])
+  @@index([storeId, method])
+  @@index([shiftId])
+  @@map("payments")
+}
+
+model Receipt {
+  id            String    @id @default(cuid())
+  saleId        String    @unique @map("sale_id")
+  storeId       String    @map("store_id")
+  receiptNumber String    @unique @map("receipt_number")
+  printedAt     DateTime? @map("printed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  sale  Sale  @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("receipts")
+}
+
+model StockMovement {
+  id             String            @id @default(cuid())
+  storeId        String            @map("store_id")
+  productId      String            @map("product_id")
+  type           StockMovementType
+  quantityChange Decimal           @map("quantity_change") @db.Decimal(12, 3)
+  stockBefore    Decimal           @map("stock_before") @db.Decimal(12, 3)
+  stockAfter     Decimal           @map("stock_after") @db.Decimal(12, 3)
+  referenceType  String?           @map("reference_type")
+  referenceId    String?           @map("reference_id")
+  reason         String?
+  createdById    String?           @map("created_by_id")
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([storeId, productId, createdAt])
+  @@index([storeId, type])
+  @@index([storeId, createdAt])
+  @@map("stock_movements")
+}
+
+model RestockOrder {
+  id           String        @id @default(cuid())
+  storeId      String        @map("store_id")
+  supplierId   String?       @map("supplier_id")
+  orderNumber  String        @unique @map("order_number")
+  status       RestockStatus @default(DRAFT)
+  orderDate    DateTime      @default(now()) @map("order_date")
+  receivedDate DateTime?     @map("received_date")
+  notes        String?
+  totalCost    Decimal       @default(0) @map("total_cost") @db.Decimal(14, 2)
+  createdById  String        @map("created_by_id")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  store     Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  supplier  Supplier?          @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdBy User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  items     RestockOrderItem[]
+
+  @@index([storeId, status])
+  @@index([storeId, supplierId])
+  @@map("restock_orders")
+}
+
+model RestockOrderItem {
+  id               String   @id @default(cuid())
+  restockOrderId   String   @map("restock_order_id")
+  productId        String   @map("product_id")
+  quantityOrdered  Decimal  @map("quantity_ordered") @db.Decimal(12, 3)
+  quantityReceived Decimal  @default(0) @map("quantity_received") @db.Decimal(12, 3)
+  unitCost         Decimal  @map("unit_cost") @db.Decimal(14, 2)
+  subtotal         Decimal  @db.Decimal(14, 2)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  restockOrder RestockOrder @relation(fields: [restockOrderId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([restockOrderId])
+  @@index([productId])
+  @@map("restock_order_items")
+}
+
+model DebtPayment {
+  id           String        @id @default(cuid())
+  storeId      String        @map("store_id")
+  customerId   String        @map("customer_id")
+  receivedById String        @map("received_by_id")
+  shiftId      String?       @map("shift_id")
+  amount       Decimal       @db.Decimal(14, 2)
+  method       PaymentMethod
+  reference    String?
+  notes        String?
+  paidAt       DateTime      @default(now()) @map("paid_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  receivedBy User     @relation(fields: [receivedById], references: [id], onDelete: Restrict)
+  shift      Shift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, customerId])
+  @@index([storeId, paidAt])
+  @@map("debt_payments")
+}
+
+model StoreSetting {
+  id                   String   @id @default(cuid())
+  storeId              String   @unique @map("store_id")
+  allowNegativeStock   Boolean  @default(false) @map("allow_negative_stock")
+  taxEnabled           Boolean  @default(false) @map("tax_enabled")
+  taxRate              Decimal  @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  serviceChargeEnabled Boolean  @default(false) @map("service_charge_enabled")
+  serviceChargeRate    Decimal  @default(0) @map("service_charge_rate") @db.Decimal(5, 2)
+  receiptWidth         String   @default("80mm") @map("receipt_width")
+  receiptFooter        String?  @map("receipt_footer")
+  lowStockAlertEnabled Boolean  @default(true) @map("low_stock_alert_enabled")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("store_settings")
+}
+
+model ActivityLog {
+  id           String         @id @default(cuid())
+  storeId      String         @map("store_id")
+  userId       String?        @map("user_id")
+  action       ActivityAction
+  module       String
+  description  String
+  metadataJson Json?          @map("metadata_json")
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, createdAt])
+  @@index([storeId, module])
+  @@index([storeId, action])
+  @@map("activity_logs")
 }
