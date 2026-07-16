@@ -54,4 +54,4 @@ export type PaymentInput = {
   notes?: string;
 };
 
-export type StockLevel = "OUT_OF_STOCK" | "LOW" | "NORMAL";
+export type { StockLevel } from "@/lib/pos/stock-level";

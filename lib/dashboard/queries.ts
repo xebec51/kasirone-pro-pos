@@ -1,7 +1,7 @@
 import { startOfDay, subDays } from "date-fns";
 import { prisma } from "@/lib/db";
 import { toNumber } from "@/lib/pos/money";
-import { calculateLowStockStatus } from "@/lib/pos/stock";
+import { calculateLowStockStatus } from "@/lib/pos/stock-level";
 
 const RECENT_ACTIVITY_LIMIT = 8;
 const TOP_PRODUCTS_LIMIT = 5;
@@ -47,12 +47,11 @@ export async function getLowStockProducts(storeId: string) {
   });
 
   const withStatus = products
-    .map((p) => ({
-      ...p,
-      stock: toNumber(p.stock),
-      minStock: toNumber(p.minStock),
-      level: calculateLowStockStatus(p.stock, p.minStock),
-    }))
+    .map((p) => {
+      const stock = toNumber(p.stock);
+      const minStock = toNumber(p.minStock);
+      return { ...p, stock, minStock, level: calculateLowStockStatus(stock, minStock) };
+    })
     .filter((p): p is typeof p & { level: "OUT_OF_STOCK" | "LOW" } => p.level !== "NORMAL")
     .sort((a, b) => a.stock - b.stock);
 

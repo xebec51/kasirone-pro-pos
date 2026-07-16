@@ -1,5 +1,13 @@
 import { Prisma } from "@/app/generated/prisma/client";
 import type { Decimalish, SaleTotals, SaleTotalsInput } from "@/lib/pos/types";
+import { roundMoney } from "@/lib/pos/currency";
+
+// Re-exported so existing server-side imports of `formatCurrencyIDR`/`roundMoney`
+// from "@/lib/pos/money" keep working. Client Components must import these from
+// "@/lib/pos/currency" directly — this module pulls in the Prisma client (via
+// Prisma.Decimal below), which breaks browser bundling. See feedback memory:
+// no-functions-across-server-client-boundary-esque issue, same root cause.
+export { formatCurrencyIDR, roundMoney } from "@/lib/pos/currency";
 
 export function toDecimal(value: Decimalish): Prisma.Decimal {
   return value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value);
@@ -7,21 +15,6 @@ export function toDecimal(value: Decimalish): Prisma.Decimal {
 
 export function toNumber(value: Decimalish): number {
   return toDecimal(value).toNumber();
-}
-
-export function formatCurrencyIDR(value: Decimalish): string {
-  const amount = toNumber(value);
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-/** Rounds to 2 decimal places to avoid floating point drift before persisting. */
-export function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 export function calculateSaleTotals(input: SaleTotalsInput): SaleTotals {

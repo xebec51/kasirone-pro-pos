@@ -1,16 +1,7 @@
 import { toNumber } from "@/lib/pos/money";
-import type { Decimalish, SaleItemInput, StockLevel } from "@/lib/pos/types";
+import type { Decimalish, SaleItemInput } from "@/lib/pos/types";
 
-export function calculateLowStockStatus(
-  stock: Decimalish,
-  minStock: Decimalish,
-): StockLevel {
-  const currentStock = toNumber(stock);
-  const min = toNumber(minStock);
-  if (currentStock <= 0) return "OUT_OF_STOCK";
-  if (min > 0 && currentStock <= min) return "LOW";
-  return "NORMAL";
-}
+export { calculateLowStockStatus } from "@/lib/pos/stock-level";
 
 export function validateStockAvailability(
   availableStock: Decimalish,
